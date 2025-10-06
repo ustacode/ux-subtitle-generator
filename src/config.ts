@@ -11,6 +11,12 @@ const parseNumber = (value: string | undefined, fallback: number): number => {
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
+const parseFloatSafe = (value: string | undefined, fallback: number): number => {
+  if (!value) return fallback;
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
 const parsePositiveInt = (
   value: string | undefined,
   fallback?: number
@@ -66,6 +72,7 @@ export interface AppConfig {
   openaiKey: string;
   sourceUrl: string;
   chunkFlushMs: number;
+  silenceThreshold: number;
   maxTranscriptionsPerMinute?: number;
   maxTranscriptionsPerHour?: number;
   transcriberProvider: TranscriberProvider;
@@ -78,6 +85,7 @@ export const config: AppConfig = {
   openaiKey: process.env.OPENAI_API_KEY ?? "",
   sourceUrl: process.env.SOURCE_URL ?? "srt://localhost:9000",
   chunkFlushMs: parseNumber(process.env.CHUNK_FLUSH_MS, 2000),
+  silenceThreshold: parseFloatSafe(process.env.SILENCE_THRESHOLD, 0.015),
   maxTranscriptionsPerMinute: parsePositiveInt(
     process.env.MAX_TRANSCRIPTIONS_PER_MINUTE,
     60

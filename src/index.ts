@@ -11,6 +11,7 @@ import {
 } from "./agents/index.js";
 import type { Translator } from "./agents/Translator.js";
 import { SlidingWindowRateLimiter } from "./utils/rateLimiter.js";
+import { filterSilence } from "./utils/audio.js";
 
 const app = express();
 const server = http.createServer(app);
@@ -21,6 +22,7 @@ console.log(
     port: config.port,
     sourceUrl: config.sourceUrl,
     chunkFlushMs: config.chunkFlushMs,
+    silenceThreshold: config.silenceThreshold,
     maxTranscriptionsPerMinute: config.maxTranscriptionsPerMinute ?? null,
     maxTranscriptionsPerHour: config.maxTranscriptionsPerHour ?? null,
     transcriberProvider: config.transcriberProvider,
@@ -78,11 +80,28 @@ const buffer = new ChunkBuffer(
         `\n[Pipeline] Sending audio chunk (${audio.length} bytes) to transcriber`
       );
 
+      const cleanedAudio = filterSilence(audio, {
+        threshold: config.silenceThreshold,
+      });
+
+      if (cleanedAudio.length === 0) {
+        console.debug(
+          `\n[Pipeline] Skipping chunk after silence filtering (original ${audio.length} bytes)`
+        );
+        return;
+      }
+
+      if (cleanedAudio.length !== audio.length) {
+        console.debug(
+          `\n[Pipeline] Filtered chunk size ${cleanedAudio.length} bytes (original ${audio.length} bytes)`
+        );
+      }
+
       if (transcriptionLimiter) {
         await transcriptionLimiter.acquire("transcriptions");
       }
 
-      const transcription = await transcriber.transcribe(audio);
+      const transcription = await transcriber.transcribe(cleanedAudio);
       if (!transcription) return;
 
       let finalText = transcription;

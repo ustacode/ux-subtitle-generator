@@ -1,20 +1,54 @@
 <!DOCTYPE html>
 <html>
-  <body
-    style="
-      background: transparent;
-      color: white;
-      font-size: 30px;
-      text-shadow: 2px 2px 4px #000;
-    "
-  >
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      html, body {
+        margin: 0;
+        padding: 0;
+        background: transparent;
+        height: 100%;
+        overflow: hidden;
+      }
+
+      /* Highly visible subtitle styling */
+      #subtitles {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 5%;
+        padding: 0 3vw;
+        width: 100%;
+        text-align: center;
+        color: #ffd54f; /* warm yellow */
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+        font-weight: 900;
+        font-size: 56px;
+        line-height: 1.2;
+        letter-spacing: 0.3px;
+        /* strong shadow for readability on any background */
+        text-shadow:
+          0 0 10px rgba(0, 0, 0, 0.9),
+          0 0 20px rgba(0, 0, 0, 0.7),
+          2px 2px 0 rgba(0, 0, 0, 0.9);
+        -webkit-text-stroke: 1px rgba(0, 0, 0, 0.9);
+      }
+
+      /* Scale down on smaller canvases */
+      @media (max-width: 800px) {
+        #subtitles { font-size: 40px; }
+      }
+    </style>
+  </head>
+  <body>
     <div id="subtitles"></div>
     <script>
       const protocol = location.protocol === "https:" ? "wss" : "ws";
       const ws = new WebSocket(`${protocol}://${location.host}`);
       ws.onmessage = (e) => {
         const { text } = JSON.parse(e.data);
-        document.getElementById("subtitles").innerText = text;
+        document.getElementById("subtitles").innerText = text || "";
       };
     </script>
   </body>

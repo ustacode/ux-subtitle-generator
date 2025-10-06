@@ -36,3 +36,68 @@ export const pcm16leToWav = (
   pcm.copy(wav, headerSize);
   return wav;
 };
+
+export interface SilenceFilterOptions {
+  sampleRate?: number;
+  frameMs?: number;
+  threshold?: number;
+  paddingMs?: number;
+}
+
+/**
+ * Removes low-energy frames (background noise) from a PCM s16le buffer.
+ * Returns an empty buffer when the entire chunk is silence.
+ */
+export const filterSilence = (
+  pcm: Buffer,
+  {
+    sampleRate = 16_000,
+    frameMs = 20,
+    threshold = 0.015,
+    paddingMs = 80,
+  }: SilenceFilterOptions = {}
+): Buffer => {
+  if (pcm.length === 0) return pcm;
+
+  const samples = pcm.length / 2;
+  const frameSamples = Math.max(1, Math.round((sampleRate * frameMs) / 1000));
+  const paddingSamples = Math.round((sampleRate * paddingMs) / 1000);
+
+  const view = new Int16Array(pcm.buffer, pcm.byteOffset, samples);
+  const keepMask = new Uint8Array(samples);
+
+  for (let start = 0; start < samples; start += frameSamples) {
+    const size = Math.min(frameSamples, samples - start);
+    let sumSquares = 0;
+    for (let i = 0; i < size; i++) {
+      const sample = view[start + i];
+      sumSquares += sample * sample;
+    }
+
+    const rms = Math.sqrt(sumSquares / size) / 32768;
+    if (rms >= threshold) {
+      const keepStart = Math.max(0, start - paddingSamples);
+      const keepEnd = Math.min(samples, start + size + paddingSamples);
+      keepMask.fill(1, keepStart, keepEnd);
+    }
+  }
+
+  let keepCount = 0;
+  for (let i = 0; i < samples; i++) {
+    if (keepMask[i]) keepCount += 1;
+  }
+
+  if (keepCount === 0) {
+    return Buffer.alloc(0);
+  }
+
+  const filtered = Buffer.allocUnsafe(keepCount * 2);
+  let offset = 0;
+  for (let i = 0; i < samples; i++) {
+    if (!keepMask[i]) continue;
+    filtered.writeInt16LE(view[i], offset);
+    offset += 2;
+  }
+
+  return filtered;
+};
