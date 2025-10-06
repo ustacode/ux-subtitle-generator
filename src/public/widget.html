@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+  <body
+    style="
+      background: transparent;
+      color: white;
+      font-size: 30px;
+      text-shadow: 2px 2px 4px #000;
+    "
+  >
+    <div id="subtitles"></div>
+    <script>
+      const protocol = location.protocol === "https:" ? "wss" : "ws";
+      const ws = new WebSocket(`${protocol}://${location.host}`);
+      ws.onmessage = (e) => {
+        const { text } = JSON.parse(e.data);
+        document.getElementById("subtitles").innerText = text;
+      };
+    </script>
+  </body>
+</html>
