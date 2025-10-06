@@ -1,5 +1,6 @@
 import FormData from "form-data";
 import fetch, { Response, type BodyInit } from "node-fetch";
+import { pcm16leToWav } from "../utils/audio.js";
 
 export interface Transcriber {
   transcribe(audio: Buffer): Promise<string>;
@@ -23,8 +24,10 @@ export class OpenAIWhisperTranscriber implements Transcriber {
       return "";
     }
 
+    const wavAudio = pcm16leToWav(audio);
+
     const formData = new FormData();
-    formData.append("file", audio, {
+    formData.append("file", wavAudio, {
       filename: "chunk.wav",
       contentType: "audio/wav",
     });
@@ -36,7 +39,7 @@ export class OpenAIWhisperTranscriber implements Transcriber {
       } bytes (~${(audio.length / 1024 / 1024).toFixed(3)} MiB)`
     );
 
-    OpenAIWhisperTranscriber.totalBytesSent += audio.length;
+    OpenAIWhisperTranscriber.totalBytesSent += wavAudio.length;
     console.debug(
       `[Transcriber] Total audio uploaded this session: ${
         OpenAIWhisperTranscriber.totalBytesSent

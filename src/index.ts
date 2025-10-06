@@ -10,6 +10,7 @@ import {
   createTranslator,
 } from "./agents/index.js";
 import type { Translator } from "./agents/Translator.js";
+import { SlidingWindowRateLimiter } from "./utils/rateLimiter.js";
 
 const app = express();
 const server = http.createServer(app);
@@ -20,6 +21,8 @@ console.log(
     port: config.port,
     sourceUrl: config.sourceUrl,
     chunkFlushMs: config.chunkFlushMs,
+    maxTranscriptionsPerMinute: config.maxTranscriptionsPerMinute ?? null,
+    maxTranscriptionsPerHour: config.maxTranscriptionsPerHour ?? null,
     transcriberProvider: config.transcriberProvider,
     translatorProvider: config.translatorProvider ?? null,
     translationTarget: config.translationTarget ?? null,
@@ -32,6 +35,20 @@ const transcriber = createTranscriber({
 });
 
 let translator: Translator | undefined;
+
+const limiterWindows = [
+  config.maxTranscriptionsPerMinute
+    ? { windowMs: 60_000, limit: config.maxTranscriptionsPerMinute }
+    : undefined,
+  config.maxTranscriptionsPerHour
+    ? { windowMs: 3_600_000, limit: config.maxTranscriptionsPerHour }
+    : undefined,
+].filter(Boolean) as Array<{ windowMs: number; limit: number }>;
+
+const transcriptionLimiter =
+  limiterWindows.length > 0
+    ? new SlidingWindowRateLimiter(limiterWindows)
+    : undefined;
 
 if (config.translationTarget && config.translatorProvider) {
   try {
@@ -60,6 +77,11 @@ const buffer = new ChunkBuffer(
       console.debug(
         `\n[Pipeline] Sending audio chunk (${audio.length} bytes) to transcriber`
       );
+
+      if (transcriptionLimiter) {
+        await transcriptionLimiter.acquire("transcriptions");
+      }
+
       const transcription = await transcriber.transcribe(audio);
       if (!transcription) return;
 
