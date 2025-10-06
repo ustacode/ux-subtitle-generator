@@ -4,7 +4,8 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <style>
-      html, body {
+      html,
+      body {
         margin: 0;
         padding: 0;
         background: transparent;
@@ -22,34 +23,166 @@
         width: 100%;
         text-align: center;
         color: #ffd54f; /* warm yellow */
-        font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica,
+          Arial, sans-serif;
         font-weight: 900;
         font-size: 56px;
         line-height: 1.2;
         letter-spacing: 0.3px;
         /* strong shadow for readability on any background */
-        text-shadow:
-          0 0 10px rgba(0, 0, 0, 0.9),
-          0 0 20px rgba(0, 0, 0, 0.7),
+        text-shadow: 0 0 10px rgba(0, 0, 0, 0.9), 0 0 20px rgba(0, 0, 0, 0.7),
           2px 2px 0 rgba(0, 0, 0, 0.9);
         -webkit-text-stroke: 1px rgba(0, 0, 0, 0.9);
+        z-index: 10;
+      }
+
+      /* Connection status indicator */
+      #status {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 12%;
+        width: 100%;
+        text-align: center;
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica,
+          Arial, sans-serif;
+        font-weight: 700;
+        font-size: 20px;
+        letter-spacing: 0.2px;
+        opacity: 0;
+        transition: opacity 200ms ease;
+        pointer-events: none;
+        text-shadow: 0 0 8px rgba(0, 0, 0, 0.9), 1px 1px 0 rgba(0, 0, 0, 0.9);
+        z-index: 20;
+      }
+      #status.ok {
+        color: #9ccc65;
+      }
+      #status.warn {
+        color: #ffb74d;
+      }
+      #status.error {
+        color: #ef5350;
       }
 
       /* Scale down on smaller canvases */
       @media (max-width: 800px) {
-        #subtitles { font-size: 40px; }
+        #subtitles {
+          font-size: 40px;
+        }
       }
     </style>
   </head>
   <body>
+    <div id="status" aria-live="polite" aria-atomic="true"></div>
     <div id="subtitles"></div>
     <script>
       const protocol = location.protocol === "https:" ? "wss" : "ws";
-      const ws = new WebSocket(`${protocol}://${location.host}`);
-      ws.onmessage = (e) => {
-        const { text } = JSON.parse(e.data);
-        document.getElementById("subtitles").innerText = text || "";
-      };
+      const url = `${protocol}://${location.host}`;
+
+      const el = document.getElementById("subtitles");
+      const statusEl = document.getElementById("status");
+      let ws = null;
+      let retries = 0;
+      let hideStatusTimer = null;
+      const CLEAR_AFTER_MS = 5000; // clear stale captions after 5s disconnected
+      let clearSubtitleTimer = null;
+
+      function setStatus(message, type = "warn", persist = false) {
+        if (!statusEl) return;
+        statusEl.textContent = message || "";
+        statusEl.className = type;
+        statusEl.style.opacity = message ? 1 : 0;
+        if (hideStatusTimer) clearTimeout(hideStatusTimer);
+        if (!persist && message) {
+          hideStatusTimer = setTimeout(() => {
+            statusEl.style.opacity = 0;
+          }, 1500);
+        }
+      }
+
+      function connect() {
+        try {
+          ws = new WebSocket(url);
+        } catch (err) {
+          scheduleReconnect();
+          return;
+        }
+
+        ws.onopen = () => {
+          retries = 0;
+          console.debug("[Widget] WebSocket connected");
+          setStatus("Connected", "ok");
+          cancelClearSubtitles();
+        };
+
+        ws.onmessage = (e) => {
+          try {
+            const data = JSON.parse(e.data || "{}");
+            if (typeof data.text === "string") {
+              el.innerText = data.text;
+            }
+          } catch (err) {
+            // ignore malformed messages
+          }
+          cancelClearSubtitles();
+        };
+
+        ws.onclose = () => {
+          console.debug("[Widget] WebSocket closed; scheduling reconnect");
+          setStatus(
+            "Subtitle server disconnected. Reconnecting…",
+            "warn",
+            true
+          );
+          scheduleReconnect();
+          scheduleClearSubtitles();
+        };
+
+        ws.onerror = () => {
+          setStatus(
+            "Subtitle server connection error. Reconnecting…",
+            "error",
+            true
+          );
+          try {
+            ws && ws.close();
+          } catch (_) {}
+          scheduleClearSubtitles();
+        };
+      }
+
+      function scheduleReconnect() {
+        retries += 1;
+        // Exponential backoff with jitter, capped at 10s
+        const base = Math.min(1000 * Math.pow(2, retries - 1), 10000);
+        const delay = base + Math.floor(Math.random() * 300);
+        setStatus("Reconnecting to subtitle server...", "warn", true);
+        setTimeout(connect, delay);
+      }
+
+      function scheduleClearSubtitles() {
+        if (clearSubtitleTimer) clearTimeout(clearSubtitleTimer);
+        clearSubtitleTimer = setTimeout(() => {
+          el.innerText = "";
+        }, CLEAR_AFTER_MS);
+      }
+
+      function cancelClearSubtitles() {
+        if (clearSubtitleTimer) {
+          clearTimeout(clearSubtitleTimer);
+          clearSubtitleTimer = null;
+        }
+      }
+
+      window.addEventListener("beforeunload", () => {
+        try {
+          ws && ws.close();
+        } catch (_) {}
+      });
+
+      setStatus("Connecting…", "warn");
+      connect();
     </script>
   </body>
 </html>
