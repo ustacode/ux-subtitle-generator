@@ -11,12 +11,6 @@ const parseNumber = (value: string | undefined, fallback: number): number => {
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
-const parseFloatSafe = (value: string | undefined, fallback: number): number => {
-  if (!value) return fallback;
-  const parsed = Number.parseFloat(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
-};
-
 const optionalString = (value: string | undefined): string | undefined => {
   const trimmed = value?.trim();
   return trimmed ? trimmed : undefined;
@@ -62,7 +56,6 @@ export interface AppConfig {
   openaiKey: string;
   sourceUrl: string;
   chunkFlushMs: number;
-  silenceThreshold: number;
   transcriberProvider: TranscriberProvider;
   translatorProvider?: TranslatorProvider;
   translationTarget?: string;
@@ -73,7 +66,6 @@ export const config: AppConfig = {
   openaiKey: process.env.OPENAI_API_KEY ?? "",
   sourceUrl: process.env.SOURCE_URL ?? "srt://localhost:9000",
   chunkFlushMs: parseNumber(process.env.CHUNK_FLUSH_MS, 2000),
-  silenceThreshold: parseFloatSafe(process.env.SILENCE_THRESHOLD, 0.015),
   transcriberProvider,
   translatorProvider,
   translationTarget,

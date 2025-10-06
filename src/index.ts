@@ -10,7 +10,6 @@ import {
   createTranslator,
 } from "./agents/index.js";
 import type { Translator } from "./agents/Translator.js";
-import { calculateRmsLevel } from "./utils/audio.js";
 
 const app = express();
 const server = http.createServer(app);
@@ -58,14 +57,6 @@ const ingestor = new AudioIngestor(config.sourceUrl);
 const buffer = new ChunkBuffer(
   async (audio) => {
     try {
-      const rms = calculateRmsLevel(audio);
-      if (rms < config.silenceThreshold) {
-        console.debug(
-          `\n[Pipeline] Skipping chunk (RMS ${rms.toFixed(4)} below threshold ${config.silenceThreshold})`
-        );
-        return;
-      }
-
       console.debug(
         `\n[Pipeline] Sending audio chunk (${audio.length} bytes) to transcriber`
       );

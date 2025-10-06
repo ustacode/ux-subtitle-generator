@@ -64,7 +64,7 @@ export class OpenAITranslator implements Translator {
     if (translation) {
       console.debug(`\n[Translator] Translation response: "${translation}"`);
     } else {
-      console.debug("\n[Translator] No translation provided, falling back");
+      console.debug("\n[Translator] No translation provided, falling ¡");
     }
     return translation && translation.length > 0 ? translation : text;
   }
@@ -79,7 +79,9 @@ export class OpenAITranslator implements Translator {
     this.requestHistory = this.requestHistory.filter((ts) => ts >= hourAgo);
 
     const minuteAgo = now - 60_000;
-    const perMinute = this.requestHistory.filter((ts) => ts >= minuteAgo).length;
+    const perMinute = this.requestHistory.filter(
+      (ts) => ts >= minuteAgo
+    ).length;
     const perHour = this.requestHistory.length;
 
     console.debug(
@@ -94,7 +96,9 @@ export class OpenAITranslator implements Translator {
 
     let detail = "";
     try {
-      const payload = (await response.json()) as { error?: { message?: string } };
+      const payload = (await response.json()) as {
+        error?: { message?: string };
+      };
       detail = payload.error?.message ?? "";
     } catch {
       detail = await response.text();

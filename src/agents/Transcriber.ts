@@ -7,8 +7,6 @@ export interface Transcriber {
 
 export class OpenAIWhisperTranscriber implements Transcriber {
   private static totalBytesSent = 0;
-  private static totalRequests = 0;
-  private static requestHistory: number[] = [];
 
   constructor(
     private readonly apiKey: string,
@@ -38,7 +36,16 @@ export class OpenAIWhisperTranscriber implements Transcriber {
       } bytes (~${(audio.length / 1024 / 1024).toFixed(3)} MiB)`
     );
 
-    OpenAIWhisperTranscriber.recordUsage(audio.length);
+    OpenAIWhisperTranscriber.totalBytesSent += audio.length;
+    console.debug(
+      `[Transcriber] Total audio uploaded this session: ${
+        OpenAIWhisperTranscriber.totalBytesSent
+      } bytes (~${(
+        OpenAIWhisperTranscriber.totalBytesSent /
+        1024 /
+        1024
+      ).toFixed(3)} MiB)`
+    );
 
     const response = await fetch(this.apiUrl, {
       method: "POST",
@@ -77,26 +84,4 @@ export class OpenAIWhisperTranscriber implements Transcriber {
     );
   }
 
-  private static recordUsage(bytes: number): void {
-    const now = Date.now();
-    this.totalRequests += 1;
-    this.totalBytesSent += bytes;
-    this.requestHistory.push(now);
-
-    // Keep only last hour in history for windowed stats
-    const hourAgo = now - 3_600_000;
-    this.requestHistory = this.requestHistory.filter((ts) => ts >= hourAgo);
-
-    const minuteAgo = now - 60_000;
-    const perMinute = this.requestHistory.filter((ts) => ts >= minuteAgo).length;
-    const perHour = this.requestHistory.length;
-
-    console.debug(
-      `[Transcriber] Stats — requests: total ${this.totalRequests}, last min ${perMinute}, last hour ${perHour}; bytes: total ${this.totalBytesSent} (~${(
-        this.totalBytesSent /
-        1024 /
-        1024
-      ).toFixed(3)} MiB)`
-    );
-  }
 }

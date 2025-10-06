@@ -19,7 +19,6 @@ Real-time subtitle generator for livestreams.
 - `OPENAI_API_KEY`: required for transcription/translation.
 - `SOURCE_URL`: SRT/RTMP input stream.
 - `CHUNK_FLUSH_MS`: audio window (ms) sent to the transcriber, defaults to 2000.
-- `SILENCE_THRESHOLD`: normalized RMS gate (default 0.015). Chunks below this value are treated as silence and not sent to OpenAI.
 - `TRANSLATION_TARGET`: optional language label (e.g. `Spanish`, `fr-FR`) to enable translation.
 - `TRANSCRIBER_PROVIDER` / `TRANSLATOR_PROVIDER`: switch agent backends (default `openai-*`).
 
