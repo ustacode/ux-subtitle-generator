@@ -127,7 +127,7 @@ const buffer = new ChunkBuffer(
       );
       broadcaster.broadcast(
         translatedText
-          ? { text: finalText, originalText: transcription }
+          ? { text: finalText, originalText: transcription, targetLang: config.translationTarget }
           : { text: finalText }
       );
     } catch (error) {

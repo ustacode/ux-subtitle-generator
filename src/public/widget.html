@@ -36,6 +36,32 @@
         z-index: 10;
       }
 
+      /* Two-line subtitle layout */
+      #subtitles .translated {
+        color: #ffd54f;
+        font-weight: 900;
+        font-size: 56px;
+        line-height: 1.2;
+        letter-spacing: 0.3px;
+        text-shadow: 0 0 10px rgba(0, 0, 0, 0.9),
+          0 0 20px rgba(0, 0, 0, 0.7), 2px 2px 0 rgba(0, 0, 0, 0.9);
+        -webkit-text-stroke: 1px rgba(0, 0, 0, 0.9);
+      }
+
+      #subtitles .original {
+        margin-top: 6px;
+        color: #ffffff;
+        opacity: 0.95;
+        font-weight: 700;
+        font-size: 36px;
+        line-height: 1.25;
+        letter-spacing: 0.2px;
+        text-shadow: 0 0 8px rgba(0, 0, 0, 0.9), 1px 1px 0 rgba(0, 0, 0, 0.9);
+        -webkit-text-stroke: 0.5px rgba(0, 0, 0, 0.9);
+      }
+
+      /* target language badge removed per user request */
+
       /* Connection status indicator */
       #status {
         position: fixed;
@@ -67,9 +93,8 @@
 
       /* Scale down on smaller canvases */
       @media (max-width: 800px) {
-        #subtitles {
-          font-size: 40px;
-        }
+        #subtitles .translated { font-size: 40px; }
+        #subtitles .original { font-size: 26px; }
       }
     </style>
   </head>
@@ -120,7 +145,11 @@
           try {
             const data = JSON.parse(e.data || "{}");
             if (typeof data.text === "string") {
-              el.innerText = data.text;
+              const translated = String(data.text || "");
+              const original =
+                typeof data.originalText === "string" ? String(data.originalText) : null;
+              // target language is ignored in the UI
+              el.innerHTML = renderSubtitles(translated, original);
             }
           } catch (err) {
             // ignore malformed messages
@@ -164,7 +193,7 @@
       function scheduleClearSubtitles() {
         if (clearSubtitleTimer) clearTimeout(clearSubtitleTimer);
         clearSubtitleTimer = setTimeout(() => {
-          el.innerText = "";
+          el.innerHTML = "";
         }, CLEAR_AFTER_MS);
       }
 
@@ -182,6 +211,25 @@
       });
 
       setStatus("Connecting…", "warn");
+
+      function escapeHtml(str) {
+        return String(str)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+      }
+
+      function renderSubtitles(translated, original) {
+        const t = escapeHtml(translated);
+        if (!original) {
+          return `<div class="translated">${t}</div>`;
+        }
+        const o = escapeHtml(original);
+        return `<div class="translated">${t}</div><div class="original">${o}</div>`;
+      }
+
       connect();
     </script>
   </body>
