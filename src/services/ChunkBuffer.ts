@@ -9,9 +9,6 @@ export class ChunkBuffer {
 
   push(chunk: Buffer): void {
     this.buffers.push(chunk);
-    console.debug(
-      `\n[ChunkBuffer] Buffered chunk (${chunk.length} bytes). Total buffers: ${this.buffers.length}`
-    );
     const elapsed = Date.now() - this.lastFlush;
     if (elapsed >= this.flushIntervalMs) {
       console.debug(

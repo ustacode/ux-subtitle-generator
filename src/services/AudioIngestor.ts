@@ -29,9 +29,6 @@ export class AudioIngestor extends EventEmitter {
     const ffmpeg = spawn("ffmpeg", args);
 
     ffmpeg.stdout.on("data", (chunk) => {
-      console.debug(
-        `[AudioIngestor] Received chunk (${chunk.length} bytes)`
-      );
       this.emit("chunk", chunk);
     });
     ffmpeg.stderr.on("data", (d) => {
@@ -39,9 +36,7 @@ export class AudioIngestor extends EventEmitter {
       process.stderr.write(d);
     });
     ffmpeg.on("close", (code) => {
-      console.log(
-        `\n[AudioIngestor] ffmpeg process closed with code ${code}`
-      );
+      console.log(`\n[AudioIngestor] ffmpeg process closed with code ${code}`);
       this.emit("end", code ?? 0);
     });
     ffmpeg.on("error", (error) => {
