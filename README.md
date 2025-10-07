@@ -9,6 +9,9 @@ Real-time subtitle generator for livestreams.
 - Optional live translation via OpenAI GPT-4o-mini
 - Easily embed subtitles in OBS (Browser Source)
 
+## Architecture
+![Ux Subtitle Generator architecture diagram](diagram.png)
+
 ## Usage
 1. Copy `.env.example` → `.env` and fill API key + stream URL (optionally set `TRANSLATION_TARGET`).
 2. Run `npm install`
