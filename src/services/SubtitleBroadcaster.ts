@@ -19,4 +19,4 @@ export class SubtitleBroadcaster {
     );
     for (const ws of this.clients) ws.send(msg);
   }
-}
+}boaljdajusdjajsd
