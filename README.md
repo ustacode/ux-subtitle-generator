@@ -26,6 +26,8 @@ Real-time subtitle generator for livestreams.
 - `MAX_TRANSCRIPTIONS_PER_MINUTE` / `MAX_TRANSCRIPTIONS_PER_HOUR`: optional rate limits for OpenAI calls (defaults to 60 per minute and 3600 per hour). Set to blank to disable.
 - `TRANSLATION_TARGET`: optional language label (e.g. `Spanish`, `fr-FR`) to enable translation.
 - `TRANSCRIBER_PROVIDER` / `TRANSLATOR_PROVIDER`: switch agent backends (default `openai-*`).
+- `KICK_CLIENT_ID` / `KICK_CLIENT_SECRET`: OAuth client credentials used to authenticate with Kick.
+- `kick-settings.json`: copy `kick-settings.example.json` and provide your Kick `channelSlug` (plus optional `commandPrefix`) to enable chat commands.
 
 ## Debugging FFmpeg Ingestion
 Run the same FFmpeg command locally to verify your stream:

@@ -78,7 +78,16 @@ export interface AppConfig {
   transcriberProvider: TranscriberProvider;
   translatorProvider?: TranslatorProvider;
   translationTarget?: string;
+  kick?: KickConfig;
 }
+
+export interface KickConfig {
+  clientId: string;
+  clientSecret: string;
+}
+
+const kickClientId = optionalString(process.env.KICK_CLIENT_ID);
+const kickClientSecret = optionalString(process.env.KICK_CLIENT_SECRET);
 
 export const config: AppConfig = {
   port: parseNumber(process.env.PORT, 8080),
@@ -97,4 +106,11 @@ export const config: AppConfig = {
   transcriberProvider,
   translatorProvider,
   translationTarget,
+  kick:
+    kickClientId && kickClientSecret
+      ? {
+          clientId: kickClientId,
+          clientSecret: kickClientSecret,
+        }
+      : undefined,
 };
