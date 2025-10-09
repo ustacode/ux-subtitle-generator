@@ -1,17 +1,54 @@
 import express from "express";
 import http from "http";
-import { config } from "./config.js";
 import path from "path";
+import { existsSync, readFileSync } from "fs";
+import { config } from "./config.js";
 import { AudioIngestor } from "./services/AudioIngestor.js";
 import { ChunkBuffer } from "./services/ChunkBuffer.js";
 import { SubtitleBroadcaster } from "./services/SubtitleBroadcaster.js";
-import {
-  createTranscriber,
-  createTranslator,
-} from "./agents/index.js";
+import { SubtitleService } from "./services/SubtitleService.js";
+import { createTranscriber, createTranslator } from "./agents/index.js";
 import type { Translator } from "./agents/Translator.js";
 import { SlidingWindowRateLimiter } from "./utils/rateLimiter.js";
 import { filterSilence } from "./utils/audio.js";
+import { KickCommandListener } from "./services/KickCommandListener.js";
+
+interface KickRuntimeSettings {
+  channelSlug: string;
+  commandPrefix?: string;
+}
+
+const loadKickRuntimeSettings = (): KickRuntimeSettings | undefined => {
+  const settingsPath = path.resolve(process.cwd(), "kick-settings.json");
+  if (!existsSync(settingsPath)) {
+    return undefined;
+  }
+
+  try {
+    const raw = readFileSync(settingsPath, "utf-8");
+    const parsed = JSON.parse(raw) as Partial<KickRuntimeSettings>;
+    const channelSlug =
+      typeof parsed.channelSlug === "string" ? parsed.channelSlug.trim() : "";
+
+    if (!channelSlug) {
+      console.warn(
+        "[Kick] Ignoring kick-settings.json because channelSlug is missing."
+      );
+      return undefined;
+    }
+
+    const commandPrefix =
+      typeof parsed.commandPrefix === "string" &&
+      parsed.commandPrefix.trim().length > 0
+        ? parsed.commandPrefix.trim()
+        : undefined;
+
+    return { channelSlug, commandPrefix };
+  } catch (error) {
+    console.error("[Kick] Failed to parse kick-settings.json:", error);
+    return undefined;
+  }
+};
 
 const app = express();
 const server = http.createServer(app);
@@ -121,8 +158,7 @@ const buffer = new ChunkBuffer(
       }
 
       console.debug(
-        `\n[Pipeline] Broadcasting text: "${finalText}"${
-          translatedText ? ` (original: "${transcription}")` : ""
+        `\n[Pipeline] Broadcasting text: "${finalText}"${translatedText ? ` (original: "${transcription}")` : ""
         }`
       );
       broadcaster.broadcast(
@@ -137,15 +173,97 @@ const buffer = new ChunkBuffer(
   config.chunkFlushMs
 );
 
-ingestor.on("chunk", (chunk) => buffer.push(chunk));
-ingestor.on("end", (code) => {
-  buffer.flush();
-  console.log(`\nAudio ingestion ended with code ${code}`);
-});
-ingestor.on("error", (error) =>
-  console.error("Audio ingestion error:", error)
+const subtitleService = new SubtitleService(ingestor, buffer);
+
+subtitleService.on("started", () =>
+  console.log("\n[SubtitleService] Pipeline started")
 );
-ingestor.start();
+subtitleService.on("stopped", ({ code, byCommand }) => {
+  const origin = byCommand ? "command" : "process";
+  console.log(
+    `\n[SubtitleService] Pipeline stopped by ${origin}${typeof code === "number" ? ` (code ${code})` : ""
+    }`
+  );
+});
+subtitleService.on("reset", () =>
+  console.log("\n[SubtitleService] Pipeline reset")
+);
+subtitleService.on("error", (error) =>
+  console.error("[SubtitleService] Pipeline error:", error)
+);
+
+subtitleService.start();
+
+const kickSettings = loadKickRuntimeSettings();
+
+if (config.kick && kickSettings) {
+  const kickListener = new KickCommandListener({
+    clientId: config.kick.clientId,
+    clientSecret: config.kick.clientSecret,
+  });
+
+  kickListener.on("error", (error) =>
+    console.error("[Kick] Listener error:", error)
+  );
+  kickListener.on("disconnected", (reason) =>
+    console.warn(`[Kick] Listener disconnected: ${reason}`)
+  );
+  kickListener.on("connected", () =>
+    console.log(
+      `[Kick] Listening for commands on "${kickSettings.channelSlug}" with prefix "!${
+        kickSettings.commandPrefix ?? "ux"
+      }".`
+    )
+  );
+  kickListener.on("command", async ({ action, username }) => {
+    try {
+      if (action === "start") {
+        const started = subtitleService.start();
+        console.log(
+          `[Kick] Start command from ${username} — ${
+            started ? "started" : "already running"
+          }`
+        );
+      } else if (action === "stop") {
+        const stopped = subtitleService.stop();
+        console.log(
+          `[Kick] Stop command from ${username} — ${
+            stopped ? "stopping" : "already stopped"
+          }`
+        );
+      } else if (action === "reset") {
+        const reset = await subtitleService.reset();
+        console.log(
+          `[Kick] Reset command from ${username} — ${
+            reset ? "restarted pipeline" : "failed to reset"
+          }`
+        );
+      }
+    } catch (error) {
+      console.error("[Kick] Failed to handle command:", error);
+    }
+  });
+
+  kickListener
+    .start({
+      channelSlug: kickSettings.channelSlug,
+      commandPrefix: kickSettings.commandPrefix,
+    })
+    .catch((error) => console.error("[Kick] Failed to start listener:", error));
+
+  kickListener
+    .getAccessToken()
+    .then((token) => {
+      const expiryInfo =
+        token.expiresIn > 0 ? `expires in ${token.expiresIn}s` : "no expiry";
+      console.log(`[Kick] OAuth token acquired (${expiryInfo}).`);
+    })
+    .catch((error) => console.error("[Kick] Failed to fetch OAuth token:", error));
+} else if (config.kick && !kickSettings) {
+  console.warn(
+    "[Kick] Client credentials detected but kick-settings.json is missing or invalid. Skipping Kick command listener."
+  );
+}
 
 server.listen(config.port, () =>
   console.log(`\n🚀 Server running on port ${config.port}`)
